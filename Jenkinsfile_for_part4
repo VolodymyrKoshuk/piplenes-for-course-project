@@ -1,0 +1,44 @@
+pipeline {
+  agent {
+    label 'awscli'
+  }
+
+  parameters {
+    choice(name: 'environment', choices: ['dev', 'prod'], description: 'Select environment')
+  }
+
+  stages {
+
+    stage('Build') {
+        steps {
+            git credentialsId: 'github-ssh-key', url: 'git@github.com:VolodymyrKoshuk/distribution_website.git', branch: "${params.environment}"
+        }
+    }
+
+    stage('Deploy to S3') {
+      steps {
+        script {
+          def bucketName
+
+          if (params.environment == 'dev') {
+            bucketName = "koshuk-bucket-dev"
+          } else if (params.environment == 'prod') {
+            bucketName = "koshuk-bucket-prod"
+          }
+
+          sh "aws s3 sync . s3://${bucketName} --delete"
+        }
+      }
+    }
+
+    stage('Invalidate CloudFront Cache') {
+      steps {
+        script {
+          def distributionId = "Distribution ID"
+
+          sh "aws cloudfront create-invalidation --distribution-id ${distributionId} --paths /"
+        }
+      }
+    }
+  }
+}

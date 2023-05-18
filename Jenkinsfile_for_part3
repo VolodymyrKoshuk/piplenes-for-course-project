@@ -1,0 +1,38 @@
+pipeline {
+
+    agent {
+	label 'awscli'
+    }
+
+   parameters {
+        string(name: 'GIT_REF', description: 'Git branch or tag', defaultValue: 'main')
+        string(name: 'DOCKER_TAG', description: 'Tag for Docker ECR', defaultValue: 'latest')
+    }
+
+    stages {
+        stage('Clone repository') {
+		steps {
+            git credentialsId: 'github-ssh-key', url: 'git@github.com:VolodymyrKoshuk/nodejs_app1.git', branch: "${params.GIT_REF}"
+        }
+            }
+        
+        stage('Build and push image') {
+            environment {
+                DOCKER_IMAGE = '224974567407.dkr.ecr.eu-north-1.amazonaws.com/nodejs_app1'
+            }
+            
+            steps {
+                script {
+                    // Збирання і тегування зображення
+                    sh "docker build -t $DOCKER_IMAGE:${params.DOCKER_TAG} ."
+                    
+                    // Запуск скрипту для входу в ECR реєстр
+                    sh './ecr_login.sh'
+                    
+                    // Пуш зображення до ECR реєстру
+                    sh "docker push $DOCKER_IMAGE:${params.DOCKER_TAG}"
+                }
+            }
+        }
+    }
+}
